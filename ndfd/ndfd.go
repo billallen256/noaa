@@ -2,7 +2,13 @@ package ndfd
 
 import (
 	"encoding/xml"
+	"time"
 )
+
+type TimeSpan struct {
+	Begin time.Time
+	End   time.Time
+}
 
 type DWML struct {
 	Head Head `xml:"head"`
@@ -46,7 +52,7 @@ type HeadSourceProductionCenter struct {
 type Data struct {
 	Location               DataLocation               `xml:"location"`
 	MoreWeatherInformation DataMoreWeatherInformation `xml:"moreWeatherInformation"`
-	TimeLayout             []DataTimeLayout           `xml:"time-layout"`
+	TimeLayouts            []DataTimeLayout           `xml:"time-layout"`
 	Parameters             DataParameters             `xml:"parameters"`
 }
 
@@ -66,11 +72,11 @@ type DataMoreWeatherInformation struct {
 }
 
 type DataTimeLayout struct {
-	TimeCoordinate string   `xml:"time-coordinate,attr"`
-	Summarization  string   `xml:"summarization,attr"`
-	LayoutKey      string   `xml:"layout-key"`
-	StartValidTime []string `xml:"start-valid-time"`
-	EndValidTime   []string `xml:"end-valid-time"`
+	TimeCoordinate  string   `xml:"time-coordinate,attr"`
+	Summarization   string   `xml:"summarization,attr"`
+	LayoutKey       string   `xml:"layout-key"`
+	StartValidTimes []string `xml:"start-valid-time"`
+	EndValidTimes   []string `xml:"end-valid-time"`
 }
 
 type DataParameters struct {
@@ -149,6 +155,40 @@ type DataParametersHazards struct {
 type DataParametersWaterState struct {
 	TimeLayout string `xml:"time-layout,attr"`
 	Waves      DataParametersSection
+}
+
+func generateTimeSpanCollectionMap(dwml DWML) (map[string][]TimeSpan, error) {
+	m := make(map[string][]TimeSpan)
+
+	for _, timeLayout := range dwml.Data.TimeLayouts {
+		numStartTimes := len(timeLayout.StartValidTimes)
+		numEndTimes := len(timeLayout.EndValidTimes)
+		arr := make([]TimeSpan, numStartTimes)
+
+		for i := 0; i < numStartTimes; i++ {
+			begin, err := time.Parse(time.RFC3339, timeLayout.StartValidTimes[i])
+
+			if err != nil {
+				return m, err
+			}
+
+			end := begin
+
+			if numEndTimes == numStartTimes {
+				end, err = time.Parse(time.RFC3339, timeLayout.EndValidTimes[i])
+
+				if err != nil {
+					return m, err
+				}
+			}
+
+			arr[i] = TimeSpan{begin, end}
+		}
+
+		m[timeLayout.LayoutKey] = arr
+	}
+
+	return m, nil
 }
 
 func Unmarshal(body []byte) (DWML, error) {
