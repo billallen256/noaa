@@ -44,6 +44,36 @@ type HeadSourceProductionCenter struct {
 }
 
 type Data struct {
+	Location               DataLocation               `xml:"location"`
+	MoreWeatherInformation DataMoreWeatherInformation `xml:"moreWeatherInformation"`
+	TimeLayout             []DataTimeLayout           `xml:"time-layout"`
+	Parameters             DataParameters             `xml:"parameters"`
+}
+
+type DataLocation struct {
+	LocationKey string            `xml:"location-key"`
+	Point       DataLocationPoint `xml:"point"`
+}
+
+type DataLocationPoint struct {
+	Latitude  float64 `xml:"latitude,attr"`
+	Longitude float64 `xml:"longitude,attr"`
+}
+
+type DataMoreWeatherInformation struct {
+	ApplicableLocation string `xml:"applicable-location,attr"`
+	Value              string `xml:",chardata"`
+}
+
+type DataTimeLayout struct {
+	TimeCoordinate string   `xml:"time-coordinate,attr"`
+	Summarization  string   `xml:"summarization,attr"`
+	LayoutKey      string   `xml:"layout-key"`
+	StartValidTime []string `xml:"start-valid-time"`
+	EndValidTime   []string `xml:"end-valid-time"`
+}
+
+type DataParameters struct {
 	Value map[string]interface{}
 }
 
