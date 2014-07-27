@@ -2,8 +2,82 @@ package ndfd
 
 import (
 	"encoding/xml"
+	"errors"
+	"fmt"
+	"net/http"
 	"time"
 )
+
+type NDFD struct {
+	SourceURL             string
+	Dwml                  DWML
+	TimeSpanCollectionMap map[string][]TimeSpan
+}
+
+func FetchNDFD() (NDFD, error) {
+	sourceURL := "http://graphical.weather.gov/xml/sample_products/browser_interface/ndfdXMLclient.php?whichClient=NDFDgen&lat=38.99&lon=-77.01&listLatLon=&lat1=&lon1=&lat2=&lon2=&resolutionSub=&listLat1=&listLon1=&listLat2=&listLon2=&resolutionList=&endPoint1Lat=&endPoint1Lon=&endPoint2Lat=&endPoint2Lon=&listEndPoint1Lat=&listEndPoint1Lon=&listEndPoint2Lat=&listEndPoint2Lon=&zipCodeList=&listZipCodeList=&centerPointLat=&centerPointLon=&distanceLat=&distanceLon=&resolutionSquare=&listCenterPointLat=&listCenterPointLon=&listDistanceLat=&listDistanceLon=&listResolutionSquare=&citiesLevel=&listCitiesLevel=&sector=&gmlListLatLon=&featureType=&requestedTime=&startTime=&endTime=&compType=&propertyName=&product=time-series&begin=2004-01-01T00%3A00%3A00&end=2018-07-27T00%3A00%3A00&Unit=e&maxt=maxt&mint=mint&temp=temp&qpf=qpf&pop12=pop12&snow=snow&dew=dew&wspd=wspd&wdir=wdir&sky=sky&wx=wx&waveh=waveh&icons=icons&rh=rh&appt=appt&incw34=incw34&incw50=incw50&incw64=incw64&cumw34=cumw34&cumw50=cumw50&cumw64=cumw64&critfireo=critfireo&dryfireo=dryfireo&conhazo=conhazo&ptornado=ptornado&phail=phail&ptstmwinds=ptstmwinds&pxtornado=pxtornado&pxhail=pxhail&pxtstmwinds=pxtstmwinds&ptotsvrtstm=ptotsvrtstm&pxtotsvrtstm=pxtotsvrtstm&tmpabv14d=tmpabv14d&tmpblw14d=tmpblw14d&tmpabv30d=tmpabv30d&tmpblw30d=tmpblw30d&tmpabv90d=tmpabv90d&tmpblw90d=tmpblw90d&prcpabv14d=prcpabv14d&prcpblw14d=prcpblw14d&prcpabv30d=prcpabv30d&prcpblw30d=prcpblw30d&prcpabv90d=prcpabv90d&prcpblw90d=prcpblw90d&precipa_r=precipa_r&sky_r=sky_r&td_r=td_r&temp_r=temp_r&wdir_r=wdir_r&wspd_r=wspd_r&wwa=wwa&wgust=wgust&iceaccum=iceaccum&maxrh=maxrh&minrh=minrh&Submit=Submit"
+
+	resp, err := http.Get(sourceURL)
+
+	if err != nil {
+		return NDFD{}, err
+	}
+
+	if resp.StatusCode != 200 {
+		return NDFD{}, errors.New(fmt.Sprintf("Received error %d from %s", resp.StatusCode, sourceURL))
+	}
+
+	var dwml DWML
+	decoder := xml.NewDecoder(resp.Body)
+	defer resp.Body.Close()
+	err = decoder.Decode(&dwml)
+
+	if err != nil {
+		return NDFD{}, err
+	}
+
+	tsMap, err := generateTimeSpanCollectionMap(&dwml)
+
+	if err != nil {
+		return NDFD{}, err
+	}
+
+	return NDFD{sourceURL, dwml, tsMap}, nil
+}
+
+func generateTimeSpanCollectionMap(dwml *DWML) (map[string][]TimeSpan, error) {
+	m := make(map[string][]TimeSpan)
+
+	for _, timeLayout := range dwml.Data.TimeLayouts {
+		numStartTimes := len(timeLayout.StartValidTimes)
+		numEndTimes := len(timeLayout.EndValidTimes)
+		arr := make([]TimeSpan, numStartTimes)
+
+		for i := 0; i < numStartTimes; i++ {
+			begin, err := time.Parse(time.RFC3339, timeLayout.StartValidTimes[i])
+
+			if err != nil {
+				return m, err
+			}
+
+			end := begin
+
+			if numEndTimes == numStartTimes {
+				end, err = time.Parse(time.RFC3339, timeLayout.EndValidTimes[i])
+
+				if err != nil {
+					return m, err
+				}
+			}
+
+			arr[i] = TimeSpan{begin, end}
+		}
+
+		m[timeLayout.LayoutKey] = arr
+	}
+
+	return m, nil
+}
 
 type TimeSpan struct {
 	Begin time.Time
@@ -155,50 +229,4 @@ type DataParametersHazards struct {
 type DataParametersWaterState struct {
 	TimeLayout string `xml:"time-layout,attr"`
 	Waves      DataParametersSection
-}
-
-func generateTimeSpanCollectionMap(dwml DWML) (map[string][]TimeSpan, error) {
-	m := make(map[string][]TimeSpan)
-
-	for _, timeLayout := range dwml.Data.TimeLayouts {
-		numStartTimes := len(timeLayout.StartValidTimes)
-		numEndTimes := len(timeLayout.EndValidTimes)
-		arr := make([]TimeSpan, numStartTimes)
-
-		for i := 0; i < numStartTimes; i++ {
-			begin, err := time.Parse(time.RFC3339, timeLayout.StartValidTimes[i])
-
-			if err != nil {
-				return m, err
-			}
-
-			end := begin
-
-			if numEndTimes == numStartTimes {
-				end, err = time.Parse(time.RFC3339, timeLayout.EndValidTimes[i])
-
-				if err != nil {
-					return m, err
-				}
-			}
-
-			arr[i] = TimeSpan{begin, end}
-		}
-
-		m[timeLayout.LayoutKey] = arr
-	}
-
-	return m, nil
-}
-
-func Unmarshal(body []byte) (DWML, error) {
-	var dwml DWML
-
-	err := xml.Unmarshal(body, &dwml)
-
-	if err != nil {
-		return DWML{}, err
-	}
-
-	return dwml, nil
 }
