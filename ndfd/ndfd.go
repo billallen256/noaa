@@ -74,7 +74,81 @@ type DataTimeLayout struct {
 }
 
 type DataParameters struct {
-	Value map[string]interface{}
+	ApplicableLocation         string                           `xml:"applicable-location,attr"`
+	Temperature                []DataParametersSection          `xml:"temperature"`
+	Precipitation              []DataParametersSection          `xml:"precipitation"`
+	WindSpeed                  []DataParametersSection          `xml:"wind-speed"`
+	Direction                  []DataParametersSection          `xml:"direction"`
+	CloudAmount                []DataParametersSection          `xml:"cloud-amount"`
+	ProbabilityOfPrecipitation []DataParametersSection          `xml:"probability-of-precipitation"`
+	FireWeather                []DataParametersSection          `xml:"fire-weather"`
+	ConvectiveHazard           []DataParametersConvectiveHazard `xml:"convective-hazard"`
+	ClimateAnomaly             []DataParametersClimateAnomaly   `xml:"climate-anomoly"`
+	Humidity                   []DataParametersSection          `xml:"humidity"`
+	Weather                    DataParametersWeather            `xml:"weather"`
+	ConditionsIcon             DataParametersConditionsIcon     `xml:"conditions-icon"`
+	Hazards                    DataParametersHazards            `xml:"hazards"`
+	WaterState                 DataParametersWaterState         `xml:"water-state"`
+}
+
+type DataParametersSection struct {
+	Type       string   `xml:"type,attr"`
+	Units      string   `xml:"units,attr"`
+	TimeLayout string   `xml:"time-layout,attr"`
+	Name       string   `xml:"name"`
+	Values     []string `xml:"value"`
+}
+
+type DataParametersConvectiveHazard struct {
+	Outlook         DataParametersSection `xml:"outlook"`
+	SevereComponent DataParametersSection `xml:"severe-component"`
+}
+
+type DataParametersClimateAnomaly struct {
+	Weekly   DataParametersSection `xml:"weekly"`
+	Monthly  DataParametersSection `xml:"monthly"`
+	Seasonal DataParametersSection `xml:"seasonal"`
+}
+
+type DataParametersWeather struct {
+	TimeLayout        string                            `xml:"time-layout,attr"`
+	Name              string                            `xml:"name"`
+	WeatherConditions []DataParametersWeatherConditions `xml:"weather-conditions"`
+}
+
+type DataParametersWeatherConditions struct {
+	Value DataParametersWeatherConditionsValue `xml:"value"`
+}
+
+type DataParametersWeatherConditionsValue struct {
+	Coverage    string                                         `xml:"coverage,attr"`
+	Intensity   string                                         `xml:"intensity,attr"`
+	WeatherType string                                         `xml:"weather-type,attr"`
+	Qualifier   string                                         `xml:qualifier,attr"`
+	Visibility  DataParametersWeatherConditionsValueVisibility `xml:"visibility"`
+}
+
+type DataParametersWeatherConditionsValueVisibility struct {
+	Units string `xml:"units,attr"`
+	Value string `xml:",chardata"`
+}
+
+type DataParametersConditionsIcon struct {
+	Type       string   `xml:"type,attr"`
+	TimeLayout string   `xml:"time-layout,attr"`
+	Name       string   `xml:"name"`
+	IconLink   []string `xml"icon-link"`
+}
+
+type DataParametersHazards struct {
+	TimeLayout       string `xml:"time-layout,attr"`
+	Name             string `xml:"name"`
+	HazardConditions []interface{}
+}
+
+type DataParametersWaterState struct {
+	TimeLayout string `xml:"time-layout,attr"`
+	Waves      DataParametersSection
 }
 
 func Unmarshal(body []byte) (DWML, error) {
