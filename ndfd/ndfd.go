@@ -196,71 +196,13 @@ type DataParameters struct {
 	WaterState                   DataParametersWaterState         `xml:"water-state"`
 }
 
-func (dp DataParameters) HourlyTemperatures() (string, string, []int64, error) {
-	timeLayout := "unknown"
-	units := "unknown"
-	vals := make([]int64, 0, 64)
-
-	for _, t := range dp.Temperatures {
-		if t.Type == "hourly" {
-			timeLayout = t.TimeLayout
-			units = t.Units
-
-			for _, v := range t.Values {
-				i, err := strconv.ParseInt(v, 10, 64)
-
-				if err != nil {
-					return timeLayout, units, []int64{}, err
-				}
-
-				vals = append(vals, i)
-			}
-		}
-	}
-
-	if timeLayout == "unknown" {
-		return timeLayout, units, []int64{}, errors.New("Could not find hourly temperature section")
-	}
-
-	return timeLayout, units, vals, nil
-}
-
-func (dp DataParameters) HourlyDewPoints() (string, string, []int64, error) {
-	timeLayout := "unknown"
-	units := "unknown"
-	vals := make([]int64, 0, 64)
-
-	for _, t := range dp.Temperatures {
-		if t.Type == "dew point" {
-			timeLayout = t.TimeLayout
-			units = t.Units
-
-			for _, v := range t.Values {
-				i, err := strconv.ParseInt(v, 10, 64)
-
-				if err != nil {
-					return timeLayout, units, []int64{}, err
-				}
-
-				vals = append(vals, i)
-			}
-		}
-	}
-
-	if timeLayout == "unknown" {
-		return timeLayout, units, []int64{}, errors.New("Could not find hourly dew point section")
-	}
-
-	return timeLayout, units, vals, nil
-}
-
-func (dp DataParameters) HourlyLiquidPrecip() (string, string, []float64, error) {
+func GetParametersSection(dps []DataParametersSection, name string) (string, string, []float64, error) {
 	timeLayout := "unknown"
 	units := "unknown"
 	vals := make([]float64, 0, 64)
 
-	for _, t := range dp.Precipitations {
-		if t.Type == "liquid" {
+	for _, t := range dps {
+		if t.Type == name {
 			timeLayout = t.TimeLayout
 			units = t.Units
 
@@ -277,10 +219,22 @@ func (dp DataParameters) HourlyLiquidPrecip() (string, string, []float64, error)
 	}
 
 	if timeLayout == "unknown" {
-		return timeLayout, units, []float64{}, errors.New("Could not find hourly liquid precipitation section")
+		return timeLayout, units, []float64{}, errors.New(fmt.Sprintf("Could not find section %s", name))
 	}
 
 	return timeLayout, units, vals, nil
+}
+
+func (dp DataParameters) HourlyTemperatures() (string, string, []float64, error) {
+	return GetParametersSection(dp.Temperatures, "hourly")
+}
+
+func (dp DataParameters) HourlyDewPoints() (string, string, []float64, error) {
+	return GetParametersSection(dp.Temperatures, "dew point")
+}
+
+func (dp DataParameters) HourlyLiquidPrecip() (string, string, []float64, error) {
+	return GetParametersSection(dp.Precipitations, "liquid")
 }
 
 type DataParametersSection struct {

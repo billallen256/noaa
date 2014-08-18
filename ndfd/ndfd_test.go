@@ -38,7 +38,7 @@ func TestHourlyVals(t *testing.T) {
 	fmt.Println(units)
 	fmt.Println(vals)
 
-	timeLayout, units, fvals, err := ndfdGlobal.Dwml.Data.Parameters.HourlyLiquidPrecip()
+	timeLayout, units, vals, err = ndfdGlobal.Dwml.Data.Parameters.HourlyLiquidPrecip()
 
 	if err != nil {
 		t.Errorf("%s", err)
@@ -46,5 +46,5 @@ func TestHourlyVals(t *testing.T) {
 
 	fmt.Println(timeLayout)
 	fmt.Println(units)
-	fmt.Println(fvals)
+	fmt.Println(vals)
 }
