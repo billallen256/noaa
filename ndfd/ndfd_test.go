@@ -15,6 +15,7 @@ func TestFetchAndDecode(t *testing.T) {
 	}
 
 	ndfdGlobal = n
+	fmt.Printf("%+v\n", n.Dwml.Data.Parameters)
 }
 
 func TestHourlyVals(t *testing.T) {
@@ -39,6 +40,26 @@ func TestHourlyVals(t *testing.T) {
 	fmt.Println(vals)
 
 	timeLayout, units, vals, err = ndfdGlobal.Dwml.Data.Parameters.HourlyLiquidPrecip()
+
+	if err != nil {
+		t.Errorf("%s", err)
+	}
+
+	fmt.Println(timeLayout)
+	fmt.Println(units)
+	fmt.Println(vals)
+
+	timeLayout, units, vals, err = ndfdGlobal.Dwml.Data.Parameters.HourlyWindSpeeds()
+
+	if err != nil {
+		t.Errorf("%s", err)
+	}
+
+	fmt.Println(timeLayout)
+	fmt.Println(units)
+	fmt.Println(vals)
+
+	timeLayout, units, vals, err = ndfdGlobal.Dwml.Data.Parameters.HourlyWindDirections()
 
 	if err != nil {
 		t.Errorf("%s", err)

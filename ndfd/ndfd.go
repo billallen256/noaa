@@ -237,6 +237,14 @@ func (dp DataParameters) HourlyLiquidPrecip() (string, string, []float64, error)
 	return GetParametersSection(dp.Precipitations, "liquid")
 }
 
+func (dp DataParameters) HourlyWindSpeeds() (string, string, []float64, error) {
+	return GetParametersSection(dp.WindSpeeds, "sustained")
+}
+
+func (dp DataParameters) HourlyWindDirections() (string, string, []float64, error) {
+	return GetParametersSection(dp.Directions, "wind")
+}
+
 type DataParametersSection struct {
 	Type       string   `xml:"type,attr"`
 	Units      string   `xml:"units,attr"`
