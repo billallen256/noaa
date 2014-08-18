@@ -68,4 +68,26 @@ func TestHourlyVals(t *testing.T) {
 	fmt.Println(timeLayout)
 	fmt.Println(units)
 	fmt.Println(vals)
+
+	timeLayout, units, vals, err = ndfdGlobal.Dwml.Data.Parameters.HourlySnowAmounts()
+
+	if err != nil {
+		t.Errorf("%s", err)
+	}
+
+	fmt.Println(timeLayout)
+	fmt.Println(units)
+	fmt.Println(vals)
+}
+
+func TestTimeSpanConditions(t *testing.T) {
+	conditions, err := ndfdGlobal.Dwml.collectConditions()
+
+	if err != nil {
+		t.Errorf("%s", err)
+	}
+
+	for _, c := range conditions {
+		fmt.Printf("%+v\n", c)
+	}
 }

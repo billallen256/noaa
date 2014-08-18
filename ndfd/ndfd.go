@@ -12,7 +12,7 @@ import (
 type NDFD struct {
 	SourceURL             string
 	Dwml                  DWML
-	TimeSpanCollectionMap map[string][]TimeSpan
+//	TimeSpanCollectionMap map[string][]TimeSpan
 	Conditions map[time.Time]Condition
 }
 
@@ -25,7 +25,9 @@ type Condition struct {
 	LiquidPrecipUnits string
 	WindSpeed float64
 	WindSpeedUnits string
-	WindDirection int
+	WindDirection float64
+	Snow float64
+	SnowUnits string
 }
 
 func FetchNDFD(lat, lon float64) (NDFD, error) {
@@ -50,12 +52,6 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 		return NDFD{}, err
 	}
 
-	tsMap, err := generateTimeSpanCollectionMap(&dwml)
-
-	if err != nil {
-		return NDFD{}, err
-	}
-
 //	conditions, err := collectConditions(&dwml, []string{"hourly", "dew point"})
 
 //	if err != nil {
@@ -63,10 +59,26 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 //	}
 
 //	return NDFD{sourceURL, dwml, tsMap, conditions}, nil
-	return NDFD{sourceURL, dwml, tsMap, make(map[time.Time]Condition)}, nil
+//	return NDFD{sourceURL, dwml, tsMap, make(map[time.Time]Condition)}, nil
+	return NDFD{sourceURL, dwml, make(map[time.Time]Condition)}, nil
 }
 
-func generateTimeSpanCollectionMap(dwml *DWML) (map[string][]TimeSpan, error) {
+
+//func collectConditions(dwml *DWML, paramTypes []string) map[time.Time]Condition, error {
+//	params := dwml.Data.Parameters
+//}
+
+type TimeSpan struct {
+	Begin time.Time
+	End   time.Time
+}
+
+type DWML struct {
+	Head Head `xml:"head"`
+	Data Data `xml:"data"`
+}
+
+func (dwml *DWML) generateTimeSpanCollectionMap() (map[string][]TimeSpan, error) {
 	m := make(map[string][]TimeSpan)
 
 	for _, timeLayout := range dwml.Data.TimeLayouts {
@@ -100,18 +112,137 @@ func generateTimeSpanCollectionMap(dwml *DWML) (map[string][]TimeSpan, error) {
 	return m, nil
 }
 
-//func collectConditions(dwml *DWML, paramTypes []string) map[time.Time]Condition, error {
-//	params := dwml.Data.Parameters
-//}
+func (dwml *DWML) collectConditions() ([]Condition, error) {
+	tsMap, err := dwml.generateTimeSpanCollectionMap()
 
-type TimeSpan struct {
-	Begin time.Time
-	End   time.Time
-}
+	if err != nil {
+		return []Condition{}, err
+	}
 
-type DWML struct {
-	Head Head `xml:"head"`
-	Data Data `xml:"data"`
+	tempLayout, tempUnits, tempVals, tempErr := dwml.Data.Parameters.HourlyTemperatures()
+	dewLayout, dewUnits, dewVals, dewErr := dwml.Data.Parameters.HourlyDewPoints()
+	liquidLayout, liquidUnits, liquidVals, liquidErr := dwml.Data.Parameters.HourlyLiquidPrecip()
+	windLayout, windUnits, windVals, windErr := dwml.Data.Parameters.HourlyWindSpeeds()
+	dirLayout, _, dirVals, dirErr := dwml.Data.Parameters.HourlyWindDirections()
+	snowLayout, snowUnits, snowVals, snowErr := dwml.Data.Parameters.HourlySnowAmounts()
+
+	if tempErr != nil {
+		return []Condition{}, tempErr
+	}
+
+	if dewErr != nil {
+		return []Condition{}, dewErr
+	}
+
+	if liquidErr != nil {
+		return []Condition{}, liquidErr
+	}
+
+	if windErr != nil {
+		return []Condition{}, windErr
+	}
+
+	if dirErr != nil {
+		return []Condition{}, dirErr
+	}
+
+	if snowErr != nil {
+		return []Condition{}, snowErr
+	}
+
+	conditionMap := make(map[TimeSpan]Condition)
+
+	for i, val := range tempVals {
+		layout := tsMap[tempLayout]
+
+		if condition, found := conditionMap[layout[i]]; found {
+			condition.Temp = val
+			condition.TempUnits = tempUnits
+		} else {
+			condition := Condition{}
+			condition.Temp = val
+			condition.TempUnits = tempUnits
+			conditionMap[layout[i]] = condition
+		}
+	}
+
+	for i, val := range dewVals {
+		layout := tsMap[dewLayout]
+
+		if condition, found := conditionMap[layout[i]]; found {
+			condition.DewPoint = val
+			condition.DewPointUnits = dewUnits
+		} else {
+			condition := Condition{}
+			condition.DewPoint = val
+			condition.DewPointUnits = dewUnits
+			conditionMap[layout[i]] = condition
+		}
+	}
+
+	for i, val := range liquidVals {
+		layout := tsMap[liquidLayout]
+
+		if condition, found := conditionMap[layout[i]]; found {
+			condition.LiquidPrecip = val
+			condition.LiquidPrecipUnits = liquidUnits
+		} else {
+			condition := Condition{}
+			condition.LiquidPrecip = val
+			condition.LiquidPrecipUnits = liquidUnits
+			conditionMap[layout[i]] = condition
+		}
+	}
+
+	for i, val := range windVals {
+		layout := tsMap[windLayout]
+
+		if condition, found := conditionMap[layout[i]]; found {
+			condition.WindSpeed = val
+			condition.WindSpeedUnits = windUnits
+		} else {
+			condition := Condition{}
+			condition.WindSpeed = val
+			condition.WindSpeedUnits = windUnits
+			conditionMap[layout[i]] = condition
+		}
+	}
+
+	for i, val := range dirVals {
+		layout := tsMap[dirLayout]
+
+		if condition, found := conditionMap[layout[i]]; found {
+			condition.WindDirection = val
+		} else {
+			condition := Condition{}
+			condition.WindDirection = val
+			conditionMap[layout[i]] = condition
+		}
+	}
+
+	for i, val := range snowVals {
+		layout := tsMap[snowLayout]
+
+		if condition, found := conditionMap[layout[i]]; found {
+			condition.Snow = val
+			condition.SnowUnits = snowUnits
+		} else {
+			condition := Condition{}
+			condition.Snow = val
+			condition.SnowUnits = snowUnits
+			conditionMap[layout[i]] = condition
+		}
+	}
+
+	conditions := make([]Condition, len(conditionMap))
+	cnt := 0
+
+	for _, v := range conditionMap {
+		conditions[cnt] = v
+		cnt++
+	}
+
+	return conditions, nil
 }
 
 type Head struct {
@@ -243,6 +374,10 @@ func (dp DataParameters) HourlyWindSpeeds() (string, string, []float64, error) {
 
 func (dp DataParameters) HourlyWindDirections() (string, string, []float64, error) {
 	return GetParametersSection(dp.Directions, "wind")
+}
+
+func (dp DataParameters) HourlySnowAmounts() (string, string, []float64, error) {
+	return GetParametersSection(dp.Precipitations, "snow")
 }
 
 type DataParametersSection struct {
