@@ -81,13 +81,13 @@ func TestHourlyVals(t *testing.T) {
 }
 
 func TestTimeSpanConditions(t *testing.T) {
-	conditions, err := ndfdGlobal.Dwml.collectConditions()
+	condChan, err := ndfdGlobal.Dwml.collectConditions()
 
 	if err != nil {
 		t.Errorf("%s", err)
 	}
 
-	for _, c := range conditions {
+	for c := range condChan {
 		fmt.Printf("%+v\n", c)
 	}
 }

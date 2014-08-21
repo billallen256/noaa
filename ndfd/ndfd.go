@@ -17,17 +17,10 @@ type NDFD struct {
 }
 
 type Condition struct {
-	Temp float64
-	TempUnits string
-	DewPoint float64
-	DewPointUnits string
-	LiquidPrecip float64
-	LiquidPrecipUnits string
-	WindSpeed float64
-	WindSpeedUnits string
-	WindDirection float64
-	Snow float64
-	SnowUnits string
+	Name string
+	Value float64
+	Units string
+	TimeSpan TimeSpan
 }
 
 func FetchNDFD(lat, lon float64) (NDFD, error) {
@@ -78,7 +71,7 @@ type DWML struct {
 	Data Data `xml:"data"`
 }
 
-func (dwml *DWML) generateTimeSpanCollectionMap() (map[string][]TimeSpan, error) {
+func (dwml *DWML) generateTimeSpanLayoutMap() (map[string][]TimeSpan, error) {
 	m := make(map[string][]TimeSpan)
 
 	for _, timeLayout := range dwml.Data.TimeLayouts {
@@ -112,137 +105,67 @@ func (dwml *DWML) generateTimeSpanCollectionMap() (map[string][]TimeSpan, error)
 	return m, nil
 }
 
-func (dwml *DWML) collectConditions() ([]Condition, error) {
-	tsMap, err := dwml.generateTimeSpanCollectionMap()
+func (dwml *DWML) collectConditions() (chan Condition, error) {
+	tsMap, err := dwml.generateTimeSpanLayoutMap()
+	condChan := make(chan Condition, 10)
 
 	if err != nil {
-		return []Condition{}, err
+		return condChan, err
 	}
 
-	tempLayout, tempUnits, tempVals, tempErr := dwml.Data.Parameters.HourlyTemperatures()
-	dewLayout, dewUnits, dewVals, dewErr := dwml.Data.Parameters.HourlyDewPoints()
-	liquidLayout, liquidUnits, liquidVals, liquidErr := dwml.Data.Parameters.HourlyLiquidPrecip()
-	windLayout, windUnits, windVals, windErr := dwml.Data.Parameters.HourlyWindSpeeds()
-	dirLayout, _, dirVals, dirErr := dwml.Data.Parameters.HourlyWindDirections()
-	snowLayout, snowUnits, snowVals, snowErr := dwml.Data.Parameters.HourlySnowAmounts()
+	go func() {
+		layout, units, vals, err := dwml.Data.Parameters.HourlyTemperatures()
 
-	if tempErr != nil {
-		return []Condition{}, tempErr
-	}
-
-	if dewErr != nil {
-		return []Condition{}, dewErr
-	}
-
-	if liquidErr != nil {
-		return []Condition{}, liquidErr
-	}
-
-	if windErr != nil {
-		return []Condition{}, windErr
-	}
-
-	if dirErr != nil {
-		return []Condition{}, dirErr
-	}
-
-	if snowErr != nil {
-		return []Condition{}, snowErr
-	}
-
-	conditionMap := make(map[TimeSpan]Condition)
-
-	for i, val := range tempVals {
-		layout := tsMap[tempLayout]
-
-		if condition, found := conditionMap[layout[i]]; found {
-			condition.Temp = val
-			condition.TempUnits = tempUnits
-		} else {
-			condition := Condition{}
-			condition.Temp = val
-			condition.TempUnits = tempUnits
-			conditionMap[layout[i]] = condition
+		if err == nil {
+			for i, val := range vals {
+				condChan <- Condition{"temperature", val, units, tsMap[layout][i]}
+			}
 		}
-	}
 
-	for i, val := range dewVals {
-		layout := tsMap[dewLayout]
+		layout, units, vals, err = dwml.Data.Parameters.HourlyDewPoints()
 
-		if condition, found := conditionMap[layout[i]]; found {
-			condition.DewPoint = val
-			condition.DewPointUnits = dewUnits
-		} else {
-			condition := Condition{}
-			condition.DewPoint = val
-			condition.DewPointUnits = dewUnits
-			conditionMap[layout[i]] = condition
+		if err == nil {
+			for i, val := range vals {
+				condChan <- Condition{"dew point", val, units, tsMap[layout][i]}
+			}
 		}
-	}
 
-	for i, val := range liquidVals {
-		layout := tsMap[liquidLayout]
+		layout, units, vals, err = dwml.Data.Parameters.HourlyLiquidPrecip()
 
-		if condition, found := conditionMap[layout[i]]; found {
-			condition.LiquidPrecip = val
-			condition.LiquidPrecipUnits = liquidUnits
-		} else {
-			condition := Condition{}
-			condition.LiquidPrecip = val
-			condition.LiquidPrecipUnits = liquidUnits
-			conditionMap[layout[i]] = condition
+		if err == nil {
+			for i, val := range vals {
+				condChan <- Condition{"precipitation", val, units, tsMap[layout][i]}
+			}
 		}
-	}
 
-	for i, val := range windVals {
-		layout := tsMap[windLayout]
+		layout, units, vals, err = dwml.Data.Parameters.HourlyWindSpeeds()
 
-		if condition, found := conditionMap[layout[i]]; found {
-			condition.WindSpeed = val
-			condition.WindSpeedUnits = windUnits
-		} else {
-			condition := Condition{}
-			condition.WindSpeed = val
-			condition.WindSpeedUnits = windUnits
-			conditionMap[layout[i]] = condition
+		if err == nil {
+			for i, val := range vals {
+				condChan <- Condition{"wind speed", val, units, tsMap[layout][i]}
+			}
 		}
-	}
 
-	for i, val := range dirVals {
-		layout := tsMap[dirLayout]
+		layout, units, vals, err = dwml.Data.Parameters.HourlyWindDirections()
 
-		if condition, found := conditionMap[layout[i]]; found {
-			condition.WindDirection = val
-		} else {
-			condition := Condition{}
-			condition.WindDirection = val
-			conditionMap[layout[i]] = condition
+		if err == nil {
+			for i, val := range vals {
+				condChan <- Condition{"wind direction", val, units, tsMap[layout][i]}
+			}
 		}
-	}
 
-	for i, val := range snowVals {
-		layout := tsMap[snowLayout]
+		layout, units, vals, err = dwml.Data.Parameters.HourlySnowAmounts()
 
-		if condition, found := conditionMap[layout[i]]; found {
-			condition.Snow = val
-			condition.SnowUnits = snowUnits
-		} else {
-			condition := Condition{}
-			condition.Snow = val
-			condition.SnowUnits = snowUnits
-			conditionMap[layout[i]] = condition
+		if err == nil {
+			for i, val := range vals {
+				condChan <- Condition{"snow", val, units, tsMap[layout][i]}
+			}
 		}
-	}
 
-	conditions := make([]Condition, len(conditionMap))
-	cnt := 0
+		close(condChan)
+	}()
 
-	for _, v := range conditionMap {
-		conditions[cnt] = v
-		cnt++
-	}
-
-	return conditions, nil
+	return condChan, nil
 }
 
 type Head struct {
