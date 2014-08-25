@@ -8,7 +8,7 @@ import (
 var ndfdGlobal NDFD
 
 func TestFetchAndDecode(t *testing.T) {
-	n, err := FetchNDFD(39.0, -104.0)
+	n, err := FetchNDFD(39.640102, -106.374332)
 
 	if err != nil {
 		t.Errorf("%s", err)
@@ -16,6 +16,10 @@ func TestFetchAndDecode(t *testing.T) {
 
 	ndfdGlobal = n
 	fmt.Printf("%+v\n", n.Dwml.Data.Parameters)
+}
+
+func TestDataLocation(t *testing.T) {
+	fmt.Printf("%+v\n", ndfdGlobal.Dwml.Data.Location)
 }
 
 func TestHourlyVals(t *testing.T) {
