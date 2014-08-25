@@ -34,6 +34,22 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 		return NDFD{}, err
 	}
 
+	return processNDFDResponse(resp, sourceURL)
+}
+
+
+func FetchNDFDWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
+	sourceURL := fmt.Sprintf(sourceURLFormat, lat, lon)
+	resp, err := client.Get(sourceURL)
+
+	if err != nil {
+		return NDFD{}, err
+	}
+
+	return processNDFDResponse(resp, sourceURL)
+}
+
+func processNDFDResponse(resp *http.Response, sourceURL string) (NDFD, error) {
 	if resp.StatusCode != 200 {
 		return NDFD{}, errors.New(fmt.Sprintf("Received error %d from %s", resp.StatusCode, sourceURL))
 	}
@@ -41,7 +57,7 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 	var dwml DWML
 	decoder := xml.NewDecoder(resp.Body)
 	defer resp.Body.Close()
-	err = decoder.Decode(&dwml)
+	err := decoder.Decode(&dwml)
 
 	if err != nil {
 		return NDFD{}, err
