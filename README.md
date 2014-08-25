@@ -8,4 +8,4 @@ More info at http://graphical.weather.gov/xml/rest.php
 
 To install it, run:
 
-    go get github.com/gershwinlabs/noaa
+    go get github.com/gershwinlabs/noaa/ndfd
