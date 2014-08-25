@@ -10,16 +10,15 @@ import (
 )
 
 type NDFD struct {
-	SourceURL             string
-	Dwml                  DWML
-//	TimeSpanCollectionMap map[string][]TimeSpan
-	Conditions map[time.Time]Condition
+	SourceURL  string
+	Dwml       *DWML
+	Conditions chan Condition
 }
 
 type Condition struct {
-	Name string
-	Value float64
-	Units string
+	Name     string
+	Value    float64
+	Units    string
 	TimeSpan TimeSpan
 }
 
@@ -45,21 +44,14 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 		return NDFD{}, err
 	}
 
-//	conditions, err := collectConditions(&dwml, []string{"hourly", "dew point"})
+	condChan, err := dwml.collectConditions()
 
-//	if err != nil {
-//		return NDFD{}, err
-//	}
+	if err != nil {
+		return NDFD{}, err
+	}
 
-//	return NDFD{sourceURL, dwml, tsMap, conditions}, nil
-//	return NDFD{sourceURL, dwml, tsMap, make(map[time.Time]Condition)}, nil
-	return NDFD{sourceURL, dwml, make(map[time.Time]Condition)}, nil
+	return NDFD{sourceURL, &dwml, condChan}, nil
 }
-
-
-//func collectConditions(dwml *DWML, paramTypes []string) map[time.Time]Condition, error {
-//	params := dwml.Data.Parameters
-//}
 
 type TimeSpan struct {
 	Begin time.Time
