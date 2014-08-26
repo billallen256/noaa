@@ -24,6 +24,8 @@ type Condition struct {
 	Value float64
 	Units string
 	Hour  time.Time
+	Lat   float64
+	Lon   float64
 }
 
 func FetchNDFD(lat, lon float64) (NDFD, error) {
@@ -155,12 +157,15 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 	}
 
 	go func() {
+		lat := dwml.Data.Location.Point.Latitude
+		lon := dwml.Data.Location.Point.Longitude
+
 		layout, units, vals, err := dwml.Data.Parameters.HourlyTemperatures()
 
 		if err == nil {
 			for i, val := range vals {
 				for _, hour := range tsMap[layout][i].Hours() {
-					condChan <- Condition{"temperature", val, units, hour}
+					condChan <- Condition{"temp", val, units, hour, lat, lon}
 				}
 			}
 		}
@@ -170,7 +175,7 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 		if err == nil {
 			for i, val := range vals {
 				for _, hour := range tsMap[layout][i].Hours() {
-					condChan <- Condition{"dew point", val, units, hour}
+					condChan <- Condition{"dewpoint", val, units, hour, lat, lon}
 				}
 			}
 		}
@@ -180,7 +185,7 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 		if err == nil {
 			for i, val := range vals {
 				for _, hour := range tsMap[layout][i].Hours() {
-					condChan <- Condition{"precipitation", val, units, hour}
+					condChan <- Condition{"precip", val, units, hour, lat, lon}
 				}
 			}
 		}
@@ -190,7 +195,7 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 		if err == nil {
 			for i, val := range vals {
 				for _, hour := range tsMap[layout][i].Hours() {
-					condChan <- Condition{"wind speed", val, units, hour}
+					condChan <- Condition{"windspeed", val, units, hour, lat, lon}
 				}
 			}
 		}
@@ -200,7 +205,7 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 		if err == nil {
 			for i, val := range vals {
 				for _, hour := range tsMap[layout][i].Hours() {
-					condChan <- Condition{"wind direction", val, units, hour}
+					condChan <- Condition{"winddir", val, units, hour, lat, lon}
 				}
 			}
 		}
@@ -210,7 +215,7 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 		if err == nil {
 			for i, val := range vals {
 				for _, hour := range tsMap[layout][i].Hours() {
-					condChan <- Condition{"snow", val, units, hour}
+					condChan <- Condition{"snow", val, units, hour, lat, lon}
 				}
 			}
 		}
