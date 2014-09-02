@@ -4,13 +4,15 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
 
 const (
-	sourceURLFormat = "http://graphical.weather.gov/xml/sample_products/browser_interface/ndfdXMLclient.php?whichClient=NDFDgen&lat=%f&lon=%f&listLatLon=&lat1=&lon1=&lat2=&lon2=&resolutionSub=&listLat1=&listLon1=&listLat2=&listLon2=&resolutionList=&endPoint1Lat=&endPoint1Lon=&endPoint2Lat=&endPoint2Lon=&listEndPoint1Lat=&listEndPoint1Lon=&listEndPoint2Lat=&listEndPoint2Lon=&zipCodeList=&listZipCodeList=&centerPointLat=&centerPointLon=&distanceLat=&distanceLon=&resolutionSquare=&listCenterPointLat=&listCenterPointLon=&listDistanceLat=&listDistanceLon=&listResolutionSquare=&citiesLevel=&listCitiesLevel=&sector=&gmlListLatLon=&featureType=&requestedTime=&startTime=&endTime=&compType=&propertyName=&product=time-series&begin=2004-01-01T00%3A00%3A00&end=2018-07-27T00%3A00%3A00&Unit=e&maxt=maxt&mint=mint&temp=temp&qpf=qpf&pop12=pop12&snow=snow&dew=dew&wspd=wspd&wdir=wdir&sky=sky&wx=wx&waveh=waveh&icons=icons&rh=rh&appt=appt&incw34=incw34&incw50=incw50&incw64=incw64&cumw34=cumw34&cumw50=cumw50&cumw64=cumw64&critfireo=critfireo&dryfireo=dryfireo&conhazo=conhazo&ptornado=ptornado&phail=phail&ptstmwinds=ptstmwinds&pxtornado=pxtornado&pxhail=pxhail&pxtstmwinds=pxtstmwinds&ptotsvrtstm=ptotsvrtstm&pxtotsvrtstm=pxtotsvrtstm&tmpabv14d=tmpabv14d&tmpblw14d=tmpblw14d&tmpabv30d=tmpabv30d&tmpblw30d=tmpblw30d&tmpabv90d=tmpabv90d&tmpblw90d=tmpblw90d&prcpabv14d=prcpabv14d&prcpblw14d=prcpblw14d&prcpabv30d=prcpabv30d&prcpblw30d=prcpblw30d&prcpabv90d=prcpabv90d&prcpblw90d=prcpblw90d&precipa_r=precipa_r&sky_r=sky_r&td_r=td_r&temp_r=temp_r&wdir_r=wdir_r&wspd_r=wspd_r&wwa=wwa&wgust=wgust&iceaccum=iceaccum&maxrh=maxrh&minrh=minrh&Submit=Submit"
+	sourceURLFormat = "http://graphical.weather.gov/xml/sample_products/browser_interface/ndfdXMLclient.php?whichClient=NDFDgen&lat=%f&lon=%f&requestedTime=&startTime=&endTime=&product=time-series&begin=%s&end=%s&Unit=e&maxt=maxt&mint=mint&temp=temp&qpf=qpf&pop12=pop12&snow=snow&dew=dew&wspd=wspd&wdir=wdir&sky=sky&wx=wx&waveh=waveh&icons=icons&rh=rh&appt=appt&incw34=incw34&incw50=incw50&incw64=incw64&cumw34=cumw34&cumw50=cumw50&cumw64=cumw64&critfireo=critfireo&dryfireo=dryfireo&conhazo=conhazo&ptornado=ptornado&phail=phail&ptstmwinds=ptstmwinds&pxtornado=pxtornado&pxhail=pxhail&pxtstmwinds=pxtstmwinds&ptotsvrtstm=ptotsvrtstm&pxtotsvrtstm=pxtotsvrtstm&tmpabv14d=tmpabv14d&tmpblw14d=tmpblw14d&tmpabv30d=tmpabv30d&tmpblw30d=tmpblw30d&tmpabv90d=tmpabv90d&tmpblw90d=tmpblw90d&prcpabv14d=prcpabv14d&prcpblw14d=prcpblw14d&prcpabv30d=prcpabv30d&prcpblw30d=prcpblw30d&prcpabv90d=prcpabv90d&prcpblw90d=prcpblw90d&precipa_r=precipa_r&sky_r=sky_r&td_r=td_r&temp_r=temp_r&wdir_r=wdir_r&wspd_r=wspd_r&wwa=wwa&wgust=wgust&iceaccum=iceaccum&maxrh=maxrh&minrh=minrh&Submit=Submit"
 )
 
 type NDFD struct {
@@ -29,19 +31,31 @@ type Condition struct {
 }
 
 func FetchNDFD(lat, lon float64) (NDFD, error) {
-	sourceURL := fmt.Sprintf(sourceURLFormat, lat, lon)
-	resp, err := http.Get(sourceURL)
-
-	if err != nil {
-		return NDFD{}, err
-	}
-
-	return processNDFDResponse(resp, sourceURL)
+	return FetchNDFDWithClient(http.DefaultClient, lat, lon)
 }
 
-
 func FetchNDFDWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
-	sourceURL := fmt.Sprintf(sourceURLFormat, lat, lon)
+	b := time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC)
+	e := time.Date(2018, time.July, 27, 0, 0, 0, 0, time.UTC)
+	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
+}
+
+func FetchNDFDForecast(lat, lon float64) (NDFD, error) {
+	b := time.Now()
+	e := time.Now().Add(time.Duration(7*24) * time.Hour)
+	return FetchNDFDWithClientForTimeSpan(http.DefaultClient, TimeSpan{b, e}, lat, lon)
+}
+
+func FetchNDFDForecastWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
+	b := time.Now()
+	e := time.Now().Add(time.Duration(7*24) * time.Hour)
+	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
+}
+
+func FetchNDFDWithClientForTimeSpan(client *http.Client, ts TimeSpan, lat, lon float64) (NDFD, error) {
+	b := url.QueryEscape(ts.Begin.Format("2006-01-02T15:04:05"))
+	e := url.QueryEscape(ts.End.Format("2006-01-02T15:04:05"))
+	sourceURL := fmt.Sprintf(sourceURLFormat, lat, lon, b, e)
 	resp, err := client.Get(sourceURL)
 
 	if err != nil {
@@ -164,6 +178,10 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 
 		if err == nil {
 			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
 				for _, hour := range tsMap[layout][i].Hours() {
 					condChan <- Condition{"temp", val, units, hour, lat, lon}
 				}
@@ -174,8 +192,26 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 
 		if err == nil {
 			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
 				for _, hour := range tsMap[layout][i].Hours() {
 					condChan <- Condition{"dewpoint", val, units, hour, lat, lon}
+				}
+			}
+		}
+
+		layout, units, vals, err = dwml.Data.Parameters.HourlyCloudAmounts()
+
+		if err == nil {
+			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
+				for _, hour := range tsMap[layout][i].Hours() {
+					condChan <- Condition{"clouds", val, units, hour, lat, lon}
 				}
 			}
 		}
@@ -184,6 +220,10 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 
 		if err == nil {
 			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
 				for _, hour := range tsMap[layout][i].Hours() {
 					condChan <- Condition{"precip", val, units, hour, lat, lon}
 				}
@@ -194,6 +234,10 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 
 		if err == nil {
 			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
 				for _, hour := range tsMap[layout][i].Hours() {
 					condChan <- Condition{"windspeed", val, units, hour, lat, lon}
 				}
@@ -204,6 +248,10 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 
 		if err == nil {
 			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
 				for _, hour := range tsMap[layout][i].Hours() {
 					condChan <- Condition{"winddir", val, units, hour, lat, lon}
 				}
@@ -214,6 +262,10 @@ func (dwml *DWML) collectConditions() (chan Condition, error) {
 
 		if err == nil {
 			for i, val := range vals {
+				if math.IsNaN(val) {
+					continue
+				}
+
 				for _, hour := range tsMap[layout][i].Hours() {
 					condChan <- Condition{"snow", val, units, hour, lat, lon}
 				}
@@ -322,10 +374,10 @@ func GetParametersSection(dps []DataParametersSection, name string) (string, str
 				i, err := strconv.ParseFloat(v, 64)
 
 				if err != nil {
-					return timeLayout, units, []float64{}, err
+					vals = append(vals, math.NaN())
+				} else {
+					vals = append(vals, i)
 				}
-
-				vals = append(vals, i)
 			}
 		}
 	}
@@ -343,6 +395,10 @@ func (dp DataParameters) HourlyTemperatures() (string, string, []float64, error)
 
 func (dp DataParameters) HourlyDewPoints() (string, string, []float64, error) {
 	return GetParametersSection(dp.Temperatures, "dew point")
+}
+
+func (dp DataParameters) HourlyCloudAmounts() (string, string, []float64, error) {
+	return GetParametersSection(dp.CloudAmounts, "total")
 }
 
 func (dp DataParameters) HourlyLiquidPrecip() (string, string, []float64, error) {
