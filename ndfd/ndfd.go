@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	sourceURLFormat = "http://graphical.weather.gov/xml/sample_products/browser_interface/ndfdXMLclient.php?whichClient=NDFDgen&lat=%f&lon=%f&requestedTime=&startTime=&endTime=&product=time-series&begin=%s&end=%s&Unit=e&maxt=maxt&mint=mint&temp=temp&qpf=qpf&pop12=pop12&snow=snow&dew=dew&wspd=wspd&wdir=wdir&sky=sky&wx=wx&waveh=waveh&icons=icons&rh=rh&appt=appt&incw34=incw34&incw50=incw50&incw64=incw64&cumw34=cumw34&cumw50=cumw50&cumw64=cumw64&critfireo=critfireo&dryfireo=dryfireo&conhazo=conhazo&ptornado=ptornado&phail=phail&ptstmwinds=ptstmwinds&pxtornado=pxtornado&pxhail=pxhail&pxtstmwinds=pxtstmwinds&ptotsvrtstm=ptotsvrtstm&pxtotsvrtstm=pxtotsvrtstm&tmpabv14d=tmpabv14d&tmpblw14d=tmpblw14d&tmpabv30d=tmpabv30d&tmpblw30d=tmpblw30d&tmpabv90d=tmpabv90d&tmpblw90d=tmpblw90d&prcpabv14d=prcpabv14d&prcpblw14d=prcpblw14d&prcpabv30d=prcpabv30d&prcpblw30d=prcpblw30d&prcpabv90d=prcpabv90d&prcpblw90d=prcpblw90d&precipa_r=precipa_r&sky_r=sky_r&td_r=td_r&temp_r=temp_r&wdir_r=wdir_r&wspd_r=wspd_r&wwa=wwa&wgust=wgust&iceaccum=iceaccum&maxrh=maxrh&minrh=minrh&Submit=Submit"
+	sourceURLFormat = "http://graphical.weather.gov/xml/sample_products/browser_interface/ndfdXMLclient.php?whichClient=NDFDgen&lat=%f&lon=%f&product=time-series&begin=%s&end=%s&Unit=m&maxt=maxt&mint=mint&temp=temp&qpf=qpf&pop12=pop12&snow=snow&dew=dew&wspd=wspd&wdir=wdir&sky=sky&wx=wx&waveh=waveh&icons=icons&rh=rh&appt=appt&incw34=incw34&incw50=incw50&incw64=incw64&cumw34=cumw34&cumw50=cumw50&cumw64=cumw64&critfireo=critfireo&dryfireo=dryfireo&conhazo=conhazo&ptornado=ptornado&phail=phail&ptstmwinds=ptstmwinds&pxtornado=pxtornado&pxhail=pxhail&pxtstmwinds=pxtstmwinds&ptotsvrtstm=ptotsvrtstm&pxtotsvrtstm=pxtotsvrtstm&tmpabv14d=tmpabv14d&tmpblw14d=tmpblw14d&tmpabv30d=tmpabv30d&tmpblw30d=tmpblw30d&tmpabv90d=tmpabv90d&tmpblw90d=tmpblw90d&prcpabv14d=prcpabv14d&prcpblw14d=prcpblw14d&prcpabv30d=prcpabv30d&prcpblw30d=prcpblw30d&prcpabv90d=prcpabv90d&prcpblw90d=prcpblw90d&precipa_r=precipa_r&sky_r=sky_r&td_r=td_r&temp_r=temp_r&wdir_r=wdir_r&wspd_r=wspd_r&wwa=wwa&wgust=wgust&iceaccum=iceaccum&maxrh=maxrh&minrh=minrh&Submit=Submit"
 )
 
 type NDFD struct {
@@ -35,20 +35,18 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 }
 
 func FetchNDFDWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
-	b := time.Date(2004, time.January, 1, 0, 0, 0, 0, time.UTC)
-	e := time.Date(2018, time.July, 27, 0, 0, 0, 0, time.UTC)
+	b := time.Now().UTC().Add(time.Duration(-10*24) * time.Hour)
+	e := time.Now().UTC().Add(time.Duration(10*24) * time.Hour)
 	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
 }
 
 func FetchNDFDForecast(lat, lon float64) (NDFD, error) {
-	b := time.Now()
-	e := time.Now().Add(time.Duration(7*24) * time.Hour)
-	return FetchNDFDWithClientForTimeSpan(http.DefaultClient, TimeSpan{b, e}, lat, lon)
+	return FetchNDFDForecastWithClient(http.DefaultClient, lat, lon)
 }
 
 func FetchNDFDForecastWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
-	b := time.Now()
-	e := time.Now().Add(time.Duration(7*24) * time.Hour)
+	b := time.Now().UTC()
+	e := time.Now().UTC().Add(time.Duration(7*24) * time.Hour)
 	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
 }
 
@@ -137,7 +135,7 @@ func (dwml *DWML) generateTimeSpanLayoutMap() (map[string][]TimeSpan, error) {
 		arr := make([]TimeSpan, numStartTimes)
 
 		for i := 0; i < numStartTimes; i++ {
-			begin, err := time.Parse(time.RFC3339, timeLayout.StartValidTimes[i])
+			begin, err := time.ParseInLocation(time.RFC3339, timeLayout.StartValidTimes[i], time.UTC)
 
 			if err != nil {
 				return m, err
@@ -146,7 +144,7 @@ func (dwml *DWML) generateTimeSpanLayoutMap() (map[string][]TimeSpan, error) {
 			end := begin
 
 			if numEndTimes == numStartTimes {
-				end, err = time.Parse(time.RFC3339, timeLayout.EndValidTimes[i])
+				end, err = time.ParseInLocation(time.RFC3339, timeLayout.EndValidTimes[i], time.UTC)
 
 				if err != nil {
 					return m, err
