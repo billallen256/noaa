@@ -92,8 +92,8 @@ type TimeSpan struct {
 }
 
 func (ts TimeSpan) Hours() []time.Time {
-	begin := ts.Begin
-	end := ts.End
+	begin := ts.Begin.UTC()
+	end := ts.End.UTC()
 
 	if begin.After(end) {
 		begin, end = end, begin
