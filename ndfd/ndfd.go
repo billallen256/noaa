@@ -40,6 +40,16 @@ func FetchNDFDWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
 	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
 }
 
+func FetchNDFDCurrent(lat, lon float64) (NDFD, error) {
+	return FetchNDFDCurrentWithClient(http.DefaultClient, lat, lon)
+}
+
+func FetchNDFDCurrentWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
+	b := time.Now().UTC().Add(time.Duration(-1) * time.Hour)
+	e := time.Now().UTC().Add(time.Duration(1) * time.Hour)
+	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
+}
+
 func FetchNDFDForecast(lat, lon float64) (NDFD, error) {
 	return FetchNDFDForecastWithClient(http.DefaultClient, lat, lon)
 }
