@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"github.com/gershwinlabs/noaa"
 	"math"
 	"net/http"
 	"net/url"
@@ -37,7 +38,7 @@ func FetchNDFD(lat, lon float64) (NDFD, error) {
 func FetchNDFDWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
 	b := time.Now().UTC().Add(time.Duration(-10*24) * time.Hour)
 	e := time.Now().UTC().Add(time.Duration(10*24) * time.Hour)
-	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
+	return FetchNDFDWithClientForTimeSpan(client, noaa.TimeSpan{b, e}, lat, lon)
 }
 
 func FetchNDFDCurrent(lat, lon float64) (NDFD, error) {
@@ -47,7 +48,7 @@ func FetchNDFDCurrent(lat, lon float64) (NDFD, error) {
 func FetchNDFDCurrentWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
 	b := time.Now().UTC().Add(time.Duration(-1) * time.Hour)
 	e := time.Now().UTC().Add(time.Duration(1) * time.Hour)
-	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
+	return FetchNDFDWithClientForTimeSpan(client, noaa.TimeSpan{b, e}, lat, lon)
 }
 
 func FetchNDFDForecast(lat, lon float64) (NDFD, error) {
@@ -57,10 +58,10 @@ func FetchNDFDForecast(lat, lon float64) (NDFD, error) {
 func FetchNDFDForecastWithClient(client *http.Client, lat, lon float64) (NDFD, error) {
 	b := time.Now().UTC()
 	e := time.Now().UTC().Add(time.Duration(7*24) * time.Hour)
-	return FetchNDFDWithClientForTimeSpan(client, TimeSpan{b, e}, lat, lon)
+	return FetchNDFDWithClientForTimeSpan(client, noaa.TimeSpan{b, e}, lat, lon)
 }
 
-func FetchNDFDWithClientForTimeSpan(client *http.Client, ts TimeSpan, lat, lon float64) (NDFD, error) {
+func FetchNDFDWithClientForTimeSpan(client *http.Client, ts noaa.TimeSpan, lat, lon float64) (NDFD, error) {
 	b := url.QueryEscape(ts.Begin.Format("2006-01-02T15:04:05"))
 	e := url.QueryEscape(ts.End.Format("2006-01-02T15:04:05"))
 	sourceURL := fmt.Sprintf(sourceURLFormat, lat, lon, b, e)
@@ -96,53 +97,18 @@ func processNDFDResponse(resp *http.Response, sourceURL string) (NDFD, error) {
 	return NDFD{sourceURL, &dwml, condChan}, nil
 }
 
-type TimeSpan struct {
-	Begin time.Time
-	End   time.Time
-}
-
-func (ts TimeSpan) Hours() []time.Time {
-	begin := ts.Begin.UTC()
-	end := ts.End.UTC()
-
-	if begin.After(end) {
-		begin, end = end, begin
-	}
-
-	begin = begin.Round(time.Hour)
-	end = end.Round(time.Hour)
-
-	if begin == end {
-		return []time.Time{begin}
-	}
-
-	numHours := int(end.Sub(begin).Hours())
-
-	if numHours == 0 {
-		return []time.Time{begin}
-	}
-
-	times := make([]time.Time, numHours)
-
-	for i := 0; i < numHours; i++ {
-		times[i] = begin.Add(time.Duration(i) * time.Hour)
-	}
-
-	return times
-}
-
 type DWML struct {
 	Head Head `xml:"head"`
 	Data Data `xml:"data"`
 }
 
-func (dwml *DWML) generateTimeSpanLayoutMap() (map[string][]TimeSpan, error) {
-	m := make(map[string][]TimeSpan)
+func (dwml *DWML) generateTimeSpanLayoutMap() (map[string][]noaa.TimeSpan, error) {
+	m := make(map[string][]noaa.TimeSpan)
 
 	for _, timeLayout := range dwml.Data.TimeLayouts {
 		numStartTimes := len(timeLayout.StartValidTimes)
 		numEndTimes := len(timeLayout.EndValidTimes)
-		arr := make([]TimeSpan, numStartTimes)
+		arr := make([]noaa.TimeSpan, numStartTimes)
 
 		for i := 0; i < numStartTimes; i++ {
 			begin, err := time.ParseInLocation(time.RFC3339, timeLayout.StartValidTimes[i], time.UTC)
@@ -161,7 +127,7 @@ func (dwml *DWML) generateTimeSpanLayoutMap() (map[string][]TimeSpan, error) {
 				}
 			}
 
-			arr[i] = TimeSpan{begin, end}
+			arr[i] = noaa.TimeSpan{begin, end}
 		}
 
 		m[timeLayout.LayoutKey] = arr
