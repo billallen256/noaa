@@ -2,9 +2,12 @@ package cdo
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gershwinlabs/noaa"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 const (
@@ -16,25 +19,11 @@ type CDO struct {
 	Results  []Result `json:"results"`
 }
 
-func (cdo *CDO) collectResults() (chan *Result, error) {
-	rChan := make(chan *Result, 10)
-
-	go func() {
-		for _, result := range cdo.Results {
-			rChan <- &result
-		}
-
-		close(rChan)
-	}()
-
-	return rChan, nil
-}
-
 type Metadata struct {
-	Resultset ResultSet `json:"resultset"`
+	Resultset Resultset `json:"resultset"`
 }
 
-type ResultSet struct {
+type Resultset struct {
 	Count  int `json:"count"`
 	Limit  int `json:"limit"`
 	Offset int `json:"offset"`
@@ -49,43 +38,87 @@ type Result struct {
 }
 
 func FetchDataFromStationForTimeSpan(station string, ts noaa.TimeSpan, token string) (chan *Result, error) {
-	u, _ := url.Parse(BASE_URL + "/data")
+	rChan := make(chan *Result, 10)
+	cdoChan := make(chan *CDO)
+	logger := log.New(os.Stderr, "NOAA CDO ", log.LstdFlags)
 
-	startdate := ts.Begin.Format("2006-01-02")
-	enddate := ts.End.Format("2006-01-02")
+	// goroutine 1: handle the requests and put CDO objects
+	// on the channel to handle later
+	go func() {
+		count := 0
+		offset := 1
+		limit := 1000
+		startdate := ts.Begin.Format("2006-01-02")
+		enddate := ts.End.Format("2006-01-02")
 
-	q := u.Query()
-	q.Set("datasetid", "GHCND")
-	q.Set("limit", "1000")
-	q.Set("stationid", station)
-	q.Set("startdate", startdate)
-	q.Set("enddate", enddate)
+		for {
+			u, _ := url.Parse(BASE_URL + "/data")
 
-	u.RawQuery = q.Encode()
+			q := u.Query()
+			q.Set("datasetid", "GHCND")
+			q.Set("limit", fmt.Sprintf("%d", limit))
+			q.Set("stationid", station)
+			q.Set("startdate", startdate)
+			q.Set("enddate", enddate)
+			q.Set("offset", fmt.Sprintf("%d", offset))
+			q.Set("includemetadata", "true")
 
-	req, err := http.NewRequest("GET", u.String(), nil)
-	req.Header.Set("token", token)
-	client := &http.Client{}
-	resp, err := client.Do(req)
+			u.RawQuery = q.Encode()
+			req, err := http.NewRequest("GET", u.String(), nil)
 
-	if err != nil {
-		return nil, err
-	}
+			if err != nil {
+				logger.Println(err)
+				break
+			}
 
-	var cdo CDO
-	decoder := json.NewDecoder(resp.Body)
-	defer resp.Body.Close()
-	err = decoder.Decode(&cdo)
+			req.Header.Set("token", token)
+			client := &http.Client{}
+			resp, err := client.Do(req)
 
-	if err != nil {
-		return nil, err
-	}
+			if err != nil {
+				logger.Println(err)
+				break
+			}
 
-	rChan, err := cdo.collectResults()
+			if resp.StatusCode != 200 {
+				logger.Println(resp.Status)
+				break
+			}
 
-	if err != nil {
-		return nil, err
-	}
+			var cdo CDO
+			decoder := json.NewDecoder(resp.Body)
+			err = decoder.Decode(&cdo)
+			resp.Body.Close()
+
+			if err != nil {
+				logger.Println(err)
+				break
+			}
+
+			count = cdo.Metadata.Resultset.Count
+			logger.Printf("count=%d limit=%d offset=%d\n", count, limit, offset)
+			cdoChan <- &cdo
+
+			if count < limit+offset {
+				break
+			}
+
+			offset += limit
+		}
+
+		close(cdoChan)
+	}()
+
+	// goroutine 2: take individual results out of each CDO coming in
+	go func() {
+		for c := range cdoChan {
+			for _, result := range c.Results {
+				rChan <- &result
+			}
+		}
+
+		close(rChan)
+	}()
 
 	return rChan, nil
 }
