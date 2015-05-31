@@ -42,6 +42,7 @@ type Result struct {
 func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSpan, token string) (chan *Result, error) {
 	tsChan := make(chan noaa.TimeSpan)
 	cdoChan := make(chan *CDO)
+	rateLimiter := time.Tick(1 * time.Second)
 	rChan := make(chan *Result, 10)
 	logger := log.New(os.Stderr, "NOAA CDO ", log.LstdFlags)
 
@@ -96,6 +97,7 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 
 				req.Header.Set("token", token)
 				client := &http.Client{}
+				<-rateLimiter  // helps keep requests from blowing the NOAA quota
 				resp, err := client.Do(req)
 
 				if err != nil {
