@@ -9,6 +9,25 @@ import (
 	"time"
 )
 
+func TestSubTimeSpans(t *testing.T) {
+	begin := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC)
+	overall := noaa.TimeSpan{begin, end}
+	timeSpans := subTimeSpans(overall)
+
+	if len(timeSpans) != 4 {
+		t.Errorf("%d TimeSpans returned, but should have received 4 TimeSpans\n", len(timeSpans))
+	}
+
+	if timeSpans[0].Begin != begin {
+		t.Errorf("First TimeSpan has incorrect end %v", timeSpans[0].Begin)
+	}
+
+	if timeSpans[len(timeSpans)-1].End != end {
+		t.Errorf("Last TimeSpan has incorrect end %v", timeSpans[len(timeSpans)-1].End)
+	}
+}
+
 func TestFetchNewYork2014(t *testing.T) {
 	station := "GHCND:USW00094728"
 	token := strings.TrimSpace(os.Getenv("NOAA_TOKEN"))

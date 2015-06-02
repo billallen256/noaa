@@ -39,39 +39,37 @@ type Result struct {
 	Value      float64 `json:"value"`
 }
 
+func subTimeSpans(overallTimeSpan noaa.TimeSpan) []noaa.TimeSpan {
+	timeSpans := make([]noaa.TimeSpan, 0, 1)
+	durationRemaining := overallTimeSpan.End.Sub(overallTimeSpan.Begin)
+	begin := overallTimeSpan.Begin
+
+	for begin.Before(overallTimeSpan.End) {
+		currDuration := time.Duration(math.Min(float64(durationRemaining), float64(370*24*time.Hour)))
+		end := begin.Add(currDuration)
+		timeSpans = append(timeSpans, noaa.TimeSpan{begin, end})
+		begin = end
+		durationRemaining -= currDuration
+	}
+
+	return timeSpans
+}
+
 func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSpan, token string) (chan *Result, error) {
-	tsChan := make(chan noaa.TimeSpan)
 	cdoChan := make(chan *CDO)
 	rateLimiter := time.Tick(1 * time.Second)
 	rChan := make(chan *Result, 10)
+	timeSpans := subTimeSpans(overallTimeSpan)
 	logger := log.New(os.Stderr, "NOAA CDO ", log.LstdFlags)
 
-	// goroutine 1: make sure TimeSpans aren't too large
-	// and if they are, break them up.  Otherwise we'll
-	// get HTTP 400 back from CDO.
-	go func() {
-		durationRemaining := overallTimeSpan.End.Sub(overallTimeSpan.Begin)
-		begin := overallTimeSpan.Begin
-
-		for begin.Before(overallTimeSpan.End) {
-			currDuration := time.Duration(math.Min(float64(durationRemaining), float64(370*24*time.Hour)))
-			end := begin.Add(currDuration)
-			tsChan <- noaa.TimeSpan{begin, end}
-			begin = end.Add(24 * time.Hour) // add a day since TimeSpan is inclusive
-			durationRemaining -= currDuration
-		}
-
-		close(tsChan)
-	}()
-
-	// goroutine 2: handle the requests and put CDO objects
+	// goroutine 1: handle the requests and put CDO objects
 	// on the channel to handle later
 	go func() {
 		count := 0
 		offset := 1
 		limit := 1000
 
-		for ts := range tsChan {
+		for _, ts := range timeSpans {
 			startdate := ts.Begin.Format("2006-01-02")
 			enddate := ts.End.Format("2006-01-02")
 
@@ -97,7 +95,7 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 
 				req.Header.Set("token", token)
 				client := &http.Client{}
-				<-rateLimiter  // helps keep requests from blowing the NOAA quota
+				<-rateLimiter // helps keep requests from blowing the NOAA quota
 				resp, err := client.Do(req)
 
 				if err != nil {
@@ -135,7 +133,7 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 		}
 	}()
 
-	// goroutine 3: take individual results out of each CDO coming in
+	// goroutine 2: take individual results out of each CDO coming in
 	go func() {
 		for c := range cdoChan {
 			for _, result := range c.Results {
