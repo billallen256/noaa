@@ -44,12 +44,12 @@ func subTimeSpans(overallTimeSpan noaa.TimeSpan) []noaa.TimeSpan {
 	durationRemaining := overallTimeSpan.End.Sub(overallTimeSpan.Begin)
 	begin := overallTimeSpan.Begin
 
-	for begin.Before(overallTimeSpan.End) {
-		currDuration := time.Duration(math.Min(float64(durationRemaining), float64(370*24*time.Hour)))
+	for durationRemaining > 0 {
+		currDuration := time.Duration(math.Min(float64(durationRemaining), float64(365*24*time.Hour)))
 		end := begin.Add(currDuration)
 		timeSpans = append(timeSpans, noaa.TimeSpan{begin, end})
-		begin = end
-		durationRemaining -= currDuration
+		durationRemaining = durationRemaining - end.Sub(begin) - (24 * time.Hour)
+		begin = end.Add(24 * time.Hour)
 	}
 
 	return timeSpans
@@ -65,13 +65,12 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 	// goroutine 1: handle the requests and put CDO objects
 	// on the channel to handle later
 	go func() {
-		count := 0
-		offset := 1
-		limit := 1000
-
 		for _, ts := range timeSpans {
 			startdate := ts.Begin.Format("2006-01-02")
 			enddate := ts.End.Format("2006-01-02")
+			count := 0
+			offset := 1
+			limit := 1000
 
 			for {
 				u, _ := url.Parse(BASE_URL + "/data")
@@ -108,9 +107,9 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 					break
 				}
 
-				var cdo CDO
+				cdo := new(CDO)
 				decoder := json.NewDecoder(resp.Body)
-				err = decoder.Decode(&cdo)
+				err = decoder.Decode(cdo)
 				resp.Body.Close()
 
 				if err != nil {
@@ -119,8 +118,13 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 				}
 
 				count = cdo.Metadata.Resultset.Count
-				logger.Printf("count=%d limit=%d offset=%d\n", count, limit, offset)
-				cdoChan <- &cdo
+
+				if count == 0 {
+					break
+				}
+
+				logger.Printf("count=%d limit=%d offset=%d start=%s end=%s\n", count, limit, offset, startdate, enddate)
+				cdoChan <- cdo
 
 				if count < limit+offset {
 					break
@@ -128,9 +132,9 @@ func FetchDataFromStationForTimeSpan(station string, overallTimeSpan noaa.TimeSp
 
 				offset += limit
 			}
-
-			close(cdoChan)
 		}
+
+		close(cdoChan)
 	}()
 
 	// goroutine 2: take individual results out of each CDO coming in

@@ -11,11 +11,15 @@ import (
 
 func TestSubTimeSpans(t *testing.T) {
 	begin := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2014, 12, 31, 0, 0, 0, 0, time.UTC)
 	overall := noaa.TimeSpan{begin, end}
 	timeSpans := subTimeSpans(overall)
 
-	if len(timeSpans) != 4 {
+	for _, ts := range timeSpans {
+		fmt.Printf("%v to %v\n", ts.Begin, ts.End)
+	}
+
+	if len(timeSpans) != 5 {
 		t.Errorf("%d TimeSpans returned, but should have received 4 TimeSpans\n", len(timeSpans))
 	}
 
@@ -41,10 +45,15 @@ func TestFetchNewYork2014(t *testing.T) {
 		t.Errorf("%s", err)
 	}
 
+	fmt.Printf("First: %v\n", <-rChan)
+	var lastResult *Result
+
 	for r := range rChan {
 		numResultsFetched++
-		fmt.Printf("%+v\n", r)
+		lastResult = r
 	}
+
+	fmt.Printf("Last: %v\n", lastResult)
 
 	if numResultsFetched == 0 {
 		t.Errorf("No results fetched")
@@ -64,10 +73,15 @@ func TestFetchNewYorkOverLimit(t *testing.T) {
 		t.Errorf("%s", err)
 	}
 
+	fmt.Printf("First: %v\n", <-rChan)
+	var lastResult *Result
+
 	for r := range rChan {
 		numResultsFetched++
-		fmt.Printf("%+v\n", r)
+		lastResult = r
 	}
+
+	fmt.Printf("Last: %v\n", lastResult)
 
 	if numResultsFetched == 0 {
 		t.Errorf("No results fetched")
